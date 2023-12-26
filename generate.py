@@ -99,6 +99,8 @@ class CrosswordCreator():
         (Remove any values that are inconsistent with a variable's unary
          constraints; in this case, the length of the word.)
         """
+        print({'Before Node Consistency Reduction': self.domains})
+        print('##########################################################################################################################################')
         # loops over our domains which will be Variable objects linked to a set which is our possible words
         for word in self.domains:
             newDomain = set()
@@ -107,7 +109,8 @@ class CrosswordCreator():
                 if len(item) == word.length:
                     newDomain.add(item)
             self.domains[word] = newDomain
-
+        print({'After Node Consistency Reduction': self.domains})
+        print('##########################################################################################################################################')
     def revise(self, x, y):
         """
         Make variable `x` arc consistent with variable `y`.
@@ -117,7 +120,25 @@ class CrosswordCreator():
         Return True if a revision was made to the domain of `x`; return
         False if no revision was made.
         """
-        raise NotImplementedError
+        # check if the variables overlap
+        
+        oL = self.crossword.overlaps[x, y]
+        # if they do not overlap then return false
+        if oL == None:
+            return False     
+        # loop over x domain 
+        newDomain = set()
+        for word in self.domains[x]:
+            xoL = word[oL[0]]
+            for word2 in self.domains[y]:
+                if xoL == word2[oL[1]]:
+                    newDomain.add(word)
+        if self.domains[x] == newDomain:
+            return False
+        else:
+            self.domains[x] = newDomain
+            return True
+
 
     def ac3(self, arcs=None):
         """
@@ -127,22 +148,93 @@ class CrosswordCreator():
 
         Return True if arc consistency is enforced and no domains are empty;
         return False if one or more domains end up empty.
+
+        
         """
-        raise NotImplementedError
+        print({'Before Arc Consistency Reduction': self.domains})
+        print('##########################################################################################################################################')
+
+        overlaps = self.crossword.overlaps
+
+        if arcs != None:
+            queue = arcs
+
+        else:
+            # create a queue of all arcs
+            queue = []
+            # loop over our overlaps and as long as the value is not None we will want to add it to the queue
+            for item in overlaps:
+                if overlaps[item] != None:
+                    queue.append(item)
+        # loop over our queue if its not empty remove the first value and revise it (we will want to add back arcs but which ones???)
+        while queue:
+            # TODO: we may be able to opt this by making a dequeue function that loops over the queue and checks the domains of the first variable of each arc and chooses the one with the largest domain??
+            arc = queue.pop(0)   
+            x, y = arc[0], arc[1]    
+            revised = self.revise(x,y)
+            if revised:
+                # changes have been made to x's domain we will want to make sure it still has words in it 
+                if len(self.domains[x]) == 0:
+                    return False
+                # we will want to now double check all arcs that are linked to x to see if any more changes can be made 
+                for xArcs in overlaps:
+                    if xArcs[0] == x:
+                        queue.append(xArcs)
+        for item in self.domains:
+            print({"After Arc Consistancy Reduction": {item: self.domains[item]}})
+        print('##########################################################################################################################################')
+        return True
+            
 
     def assignment_complete(self, assignment):
         """
         Return True if `assignment` is complete (i.e., assigns a value to each
         crossword variable); return False otherwise.
         """
-        raise NotImplementedError
+        for item in assignment:
+            if assignment[item] == None:
+                return False
+        return True
 
     def consistent(self, assignment):
         """
         Return True if `assignment` is consistent (i.e., words fit in crossword
         puzzle without conflicting characters); return False otherwise.
         """
-        raise NotImplementedError
+        history = []
+        # make sure all values are unique
+        for item in assignment:
+            assignment[item] = list(assignment[item])
+
+        for item in assignment:
+            if assignment[item] in history:
+                print('False1')
+                return False
+            history.append(assignment[item])
+        # make sure all values are the correct length
+
+            if len(assignment[item][0]) != item.length:
+                print('False2')
+                return False
+        # make sure all values are arc consistent
+            itemArcs = []
+            for oL in self.crossword.overlaps:
+                if oL[0] == item and self.crossword.overlaps[oL] != None:
+                    itemArcs.append(oL)
+                
+            for arc in itemArcs:   
+                xIndex = self.crossword.overlaps[arc][0]
+                yIndex = self.crossword.overlaps[arc][1]
+                # if the neighbor variable is not assigned a values then we will want to skip it
+                if assignment[arc[1]] == False:
+                    continue
+                # if we do have an assignment for the second variable in our overlap then we will want to check the values at the overlap with the word that our variable is assigned to
+                else:
+                    if assignment[item][0][xIndex] != assignment[arc[1]][0][yIndex]:
+                        print('False3')
+                        return False
+        print('True')
+        return True
 
     def order_domain_values(self, var, assignment):
         """
@@ -172,6 +264,7 @@ class CrosswordCreator():
 
         If no assignment is possible, return None.
         """
+        self.consistent(self.domains)
         raise NotImplementedError
 
 
